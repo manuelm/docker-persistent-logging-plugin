@@ -1,0 +1,19 @@
+{
+	"description": "docker logging plugin that persists the logs locally on disc.",
+	"documentation": "https://github.com/AlbinLindskog/persistent-logging-plugin",
+	"entrypoint": ["/usr/bin/persistent-logging-plugin"],
+	"interface": {
+		"types": ["docker.logdriver/1.0"],
+		"socket": "jsonfile.sock"
+	},
+	"env": [
+		{
+			"name": "LOG_LEVEL",
+			"description": "Set log level to output for plugin logs",
+			"value": "info",
+			"settable": ["value"]
+		}
+	]
+}
+
+
