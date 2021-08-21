@@ -4,9 +4,8 @@ persistent-logging-plugin
 persistent-logging-plugin is an extension of the local file logging driver that captures output not per container
 but per image name. This ensures that the logs persists, even if you frequently release and prune old containers.
 
-
-Installing and enabling persistent-logging-plugin.
-==================================================
+Installing and enabling persistent-logging-plugin
+=================================================
 
 1. Clone the repository::
 
@@ -32,11 +31,12 @@ Installing and enabling persistent-logging-plugin.
     ID             NAME                                DESCRIPTION                                      ENABLED
     e2c4e98644d3   persistent-logging-plugin:0.0.1     docker logging plugin that persists the logs…    false
 
-# Configuring persistent-logging-plugin:
+Configuring persistent-logging-plugin
+=====================================
 
-## Option 1:
-
-    The daemon.json file allows you to configure all containers with the same options. For example::
+Option 1
+--------
+The daemon.json file allows you to configure all containers with the same options. For example::
 
     {
         "log-driver": "persistent-logging-plugin:0.0.1",
@@ -46,15 +46,15 @@ Installing and enabling persistent-logging-plugin.
     }
 
 
-## Option 2:
-
-    Configure the plugin separately for each container when using the docker run command. For example::
+Option 2:
+--------
+Configure the plugin separately for each container when using the docker run command. For example::
 
     $ docker run --log-driver persistent-logging-plugin:0.0.1 --log-opt max-size=10m ...
 
-## Option 3:
-
-    Configure the plugin separately for each container when using docker-compose. For example::
+Option 3:
+--------
+ Configure the plugin separately for each container when using docker-compose. For example::
 
     ```
     my-container:
@@ -63,6 +63,9 @@ Installing and enabling persistent-logging-plugin.
       log_opt:
          max-size: "10m"
     ```
+
+Supported options:
+------------------
 .. list-table:: Options
    :widths: 10 70 20
    :header-rows: 1
