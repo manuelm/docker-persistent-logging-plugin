@@ -1,7 +1,7 @@
 persistent-logging-plugin
 *************************
 
-persistent-logging-plugin is an extension of the local file logging driver that captures output not per container
+``persistent-logging-plugin`` is an extension of the ``local`` file logging driver that captures output not per container
 but per image name. This ensures that the logs persists, even if you frequently release and prune old containers.
 
 Installing and enabling persistent-logging-plugin
@@ -9,7 +9,7 @@ Installing and enabling persistent-logging-plugin
 
 1. Clone the repository::
 
-    $ git clone git@github.com:AlbinLindskog/persistent-logging-plugin.git
+    $ git clone git@github.com:AlbinLindskog/docker_persistent-logging-plugin.git
 
 2. The plugin is built inside a docker image and is then exported. There is an makefile to facilitate the process.
    Simply run::
@@ -64,7 +64,7 @@ Option 3:
 
 Supported options:
 ------------------
-.. list-table:: Options
+.. list-table::
    :widths: 10 70 20
    :header-rows: 1
 
@@ -80,6 +80,16 @@ Supported options:
    * - compress
      - Toggle compression of rotated log files. Enabled by default.
      - ``--log-opt compress=false``
-   * - directory
-     - The directory to write the logs to. Defaults to /var/lib/docker/logs.
-     - ``--log-opt directory=/var/log/docker/``
+
+Caveats:
+--------
+Docker plugins are ran as separate processes by the docker daemon, with separate filesystem. As such is it not possible
+to specify the location on the host filesystem where the logs will be stored. They are stored at
+``/var/lib/docker/plugins/<plugin id>/rootfs/var/logs``
+It might be possible to setup a bind mount for this location, however that will need to be specified in config.json,
+and would not be a very flexible option.
+
+The logs stored by the ``local`` file logging driver, and by extension``persistent-logging-plugin``, are intended to
+only be accessed through the driver that created them via the ``docker logs`` command, so it is not a feature worth
+spending time on, imo.
+
