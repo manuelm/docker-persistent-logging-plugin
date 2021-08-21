@@ -56,13 +56,11 @@ Option 3:
 --------
  Configure the plugin separately for each container when using docker-compose. For example::
 
-    ```
     my-container:
       ...
       log_driver: "persistent-logging-plugin:0.0.1"
       log_opt:
          max-size: "10m"
-    ```
 
 Supported options:
 ------------------
