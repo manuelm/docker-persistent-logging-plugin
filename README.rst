@@ -1,10 +1,12 @@
-# persistent-logging-plugin
+persistent-logging-plugin
+*************************
 
 persistent-logging-plugin is an extension of the local file logging driver that captures output not per container
 but per image name. This ensures that the logs persists, even if you frequently release and prune old containers.
 
 
-# Installing and enabling persistent-logging-plugin.
+Installing and enabling persistent-logging-plugin.
+==================================================
 
 1. Clone the repository::
 
@@ -17,7 +19,7 @@ but per image name. This ensures that the logs persists, even if you frequently 
 
 3. Enable the plugin::
 
-    $ docker plugin persistent-logging-plugin enable
+    $ docker plugin enable persistent-logging-plugin:0.0.1
 
 4. Restart the docker daemon for the plugin to be available::
 
@@ -27,8 +29,8 @@ but per image name. This ensures that the logs persists, even if you frequently 
 
     $ docker plugin ls
 
-    ID             NAME                                DESCRIPTION                  ENABLED
-    e2c4e98644d3   persistent-logging-plugin:0.0.1     docker logging plugin...     false
+    ID             NAME                                DESCRIPTION                                      ENABLED
+    e2c4e98644d3   persistent-logging-plugin:0.0.1     docker logging plugin that persists the logs…    false
 
 # Configuring persistent-logging-plugin:
 
@@ -37,7 +39,7 @@ but per image name. This ensures that the logs persists, even if you frequently 
     The daemon.json file allows you to configure all containers with the same options. For example::
 
     {
-        "log-driver": "persistent-logging-plugin",
+        "log-driver": "persistent-logging-plugin:0.0.1",
         "log-opts": {
             "max-size": "10m"
         }
@@ -48,23 +50,20 @@ but per image name. This ensures that the logs persists, even if you frequently 
 
     Configure the plugin separately for each container when using the docker run command. For example::
 
-    $ docker run --log-driver persistent-logging-plugin --log-opt max-size=10m ...
+    $ docker run --log-driver persistent-logging-plugin:0.0.1 --log-opt max-size=10m ...
 
 ## Option 3:
 
     Configure the plugin separately for each container when using docker-compose. For example::
 
+    ```
     my-container:
       ...
-      log_driver: "persistent-logging-plugin"
+      log_driver: "persistent-logging-plugin:0.0.1"
       log_opt:
          max-size: "10m"
-
-# Options
-
-The local persistent-logging-plugin supports the following logging options:
-
-.. list-table:: Title
+    ```
+.. list-table:: Options
    :widths: 10 70 20
    :header-rows: 1
 
