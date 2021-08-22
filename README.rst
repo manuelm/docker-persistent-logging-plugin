@@ -89,7 +89,8 @@ to specify the location on the host filesystem where the logs will be stored. Th
 It might be possible to setup a bind mount for this location, however that will need to be specified in config.json,
 and would not be a very flexible option.
 
-The logs stored by the ``local`` file logging driver, and by extension``persistent-logging-plugin``, are intended to
+The logs stored by the ``local`` file logging driver, and by extension ``persistent-logging-plugin``, are intended to
 only be accessed through the driver that created them via the ``docker logs`` command, so it is not a feature worth
 spending time on, imo.
 
+Running multiple containers from the same image, e.g. with Docker Swarm, is untested.

@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+
 var logLevels = map[string]logrus.Level{
 	"debug": logrus.DebugLevel,
 	"info":  logrus.InfoLevel,
@@ -15,6 +16,9 @@ var logLevels = map[string]logrus.Level{
 	"error": logrus.ErrorLevel,
 }
 
+
+// main simply sets up the plugins internal logging, registers the driver
+// as a LogDriver, and starts listening to requests from a unix socket.
 func main() {
 	levelVal := os.Getenv("LOG_LEVEL")
 	if levelVal == "" {

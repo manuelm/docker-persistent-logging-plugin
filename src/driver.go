@@ -15,12 +15,21 @@ import (
 	"github.com/docker/docker/api/types/backend"
 	"github.com/docker/docker/api/types/plugins/logdriver"
 	"github.com/docker/docker/daemon/logger"
-	"github.com/docker/docker/daemon/logger/jsonfilelog"
+	"github.com/docker/docker/daemon/logger/local"
 	protoio "github.com/gogo/protobuf/io"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+type logPair struct {
+	logger      logger.Logger
+	stream io.ReadCloser
+	info   logger.Info
+}
+
+
+// Actual logging driver. This is just a wrapper around dockers local file logging driver.
+// All the actual work is done
 type driver struct {
 	mu     sync.Mutex
 	logs   map[string]*logPair
@@ -28,11 +37,6 @@ type driver struct {
 	logger logger.Logger
 }
 
-type logPair struct {
-	l      logger.Logger
-	stream io.ReadCloser
-	info   logger.Info
-}
 
 func newDriver() *driver {
 	return &driver{
@@ -40,6 +44,7 @@ func newDriver() *driver {
 		idx:  make(map[string]*logPair),
 	}
 }
+
 
 func (d *driver) StartLogging(file string, logCtx logger.Info) error {
 	d.mu.Lock()
@@ -55,7 +60,7 @@ func (d *driver) StartLogging(file string, logCtx logger.Info) error {
 	if err := os.MkdirAll(filepath.Dir(logCtx.LogPath), 0755); err != nil {
 		return errors.Wrap(err, "error setting up logger dir")
 	}
-	l, err := jsonfilelog.New(logCtx)
+	logger, err := local.New(logCtx)
 	if err != nil {
 		return errors.Wrap(err, "error creating jsonfile logger")
 	}
@@ -67,7 +72,7 @@ func (d *driver) StartLogging(file string, logCtx logger.Info) error {
 	}
 
 	d.mu.Lock()
-	lf := &logPair{l, f, logCtx}
+	lf := &logPair{logger, f, logCtx}
 	d.logs[file] = lf
 	d.idx[logCtx.ContainerID] = lf
 	d.mu.Unlock()
@@ -76,15 +81,15 @@ func (d *driver) StartLogging(file string, logCtx logger.Info) error {
 	return nil
 }
 
-func (d *driver) StopLogging(file string) error {
+func (driver *driver) StopLogging(file string) error {
 	logrus.WithField("file", file).Debugf("Stop logging")
-	d.mu.Lock()
-	lf, ok := d.logs[file]
+	driver.mu.Lock()
+	lf, ok := driver.logs[file]
 	if ok {
 		lf.stream.Close()
-		delete(d.logs, file)
+		delete(driver.logs, file)
 	}
-	d.mu.Unlock()
+	driver.mu.Unlock()
 	return nil
 }
 
@@ -113,7 +118,7 @@ func consumeLog(lf *logPair) {
 		}
 		msg.Timestamp = time.Unix(0, buf.TimeNano)
 
-		if err := lf.l.Log(&msg); err != nil {
+		if err := lf.logger.Log(&msg); err != nil {
 			logrus.WithField("id", lf.info.ContainerID).WithError(err).WithField("message", msg).Error("error writing log message")
 			continue
 		}
@@ -131,7 +136,7 @@ func (d *driver) ReadLogs(info logger.Info, config logger.ReadConfig) (io.ReadCl
 	}
 
 	r, w := io.Pipe()
-	lr, ok := lf.l.(logger.LogReader)
+	lr, ok := lf.logger.(logger.LogReader)
 	if !ok {
 		return nil, fmt.Errorf("logger does not support reading")
 	}

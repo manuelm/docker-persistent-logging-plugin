@@ -11,6 +11,7 @@ import (
 	"github.com/docker/go-plugins-helpers/sdk"
 )
 
+
 type StartLoggingRequest struct {
 	File string
 	Info logger.Info
@@ -20,76 +21,79 @@ type StopLoggingRequest struct {
 	File string
 }
 
-type CapabilitiesResponse struct {
-	Err string
-	Cap logger.Capability
-}
-
 type ReadLogsRequest struct {
 	Info   logger.Info
 	Config logger.ReadConfig
 }
 
-func handlers(h *sdk.Handler, d *driver) {
-	h.HandleFunc("/LogDriver.StartLogging", func(w http.ResponseWriter, r *http.Request) {
+type Response struct {
+	Err string
+}
+
+type CapabilitiesResponse struct {
+	ReadLogs bool
+}
+
+
+func respond(err error, writer http.ResponseWriter) {
+	var response Response
+	if err != nil {
+		response.Err = err.Error()
+	}
+	json.NewEncoder(writer).Encode(&response)
+}
+
+
+// handlers implements the LogDriver protocol with some sanity checking. The protocol is detailed here:
+// https://docs.docker.com/engine/extend/plugins_logging/
+func handlers(handler *sdk.Handler, driver *driver) {
+
+	handler.HandleFunc("/LogDriver.StartLogging", func(writer http.ResponseWriter, request *http.Request) {
 		var req StartLoggingRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if err := json.NewDecoder(request.Body).Decode(&req); err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if req.Info.ContainerID == "" {
-			respond(errors.New("must provide container id in log context"), w)
+		if req.Info.ContainerImageName == "" {
+			respond(errors.New("must provide container image name in log context"), writer)
 			return
 		}
 
-		err := d.StartLogging(req.File, req.Info)
-		respond(err, w)
+		err := driver.StartLogging(req.File, req.Info)
+		respond(err, writer)
 	})
 
-	h.HandleFunc("/LogDriver.StopLogging", func(w http.ResponseWriter, r *http.Request) {
+	handler.HandleFunc("/LogDriver.StopLogging", func(writer http.ResponseWriter, request *http.Request) {
 		var req StopLoggingRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if err := json.NewDecoder(request.Body).Decode(&req); err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
 		}
-		err := d.StopLogging(req.File)
-		respond(err, w)
+		err := driver.StopLogging(req.File)
+		respond(err, writer)
 	})
 
-	h.HandleFunc("/LogDriver.Capabilities", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(&CapabilitiesResponse{
-			Cap: logger.Capability{ReadLogs: true},
-		})
+	handler.HandleFunc("/LogDriver.Capabilities", func(writer http.ResponseWriter, request *http.Request) {
+	    var response = CapabilitiesResponse{ReadLogs: true}
+		json.NewEncoder(writer).Encode(&response)
 	})
 
-	h.HandleFunc("/LogDriver.ReadLogs", func(w http.ResponseWriter, r *http.Request) {
+	handler.HandleFunc("/LogDriver.ReadLogs", func(writer http.ResponseWriter, response *http.Request) {
 		var req ReadLogsRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if err := json.NewDecoder(response.Body).Decode(&req); err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		stream, err := d.ReadLogs(req.Info, req.Config)
+		stream, err := driver.ReadLogs(req.Info, req.Config)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer stream.Close()
 
-		w.Header().Set("Content-Type", "application/x-json-stream")
-		wf := ioutils.NewWriteFlusher(w)
+		writer.Header().Set("Content-Type", "application/x-json-stream")
+		wf := ioutils.NewWriteFlusher(writer)
 		io.Copy(wf, stream)
 	})
-}
-
-type response struct {
-	Err string
-}
-
-func respond(err error, w http.ResponseWriter) {
-	var res response
-	if err != nil {
-		res.Err = err.Error()
-	}
-	json.NewEncoder(w).Encode(&res)
 }
