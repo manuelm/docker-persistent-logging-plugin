@@ -21,13 +21,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+
 type loggerContext struct {
 	logger      logger.Logger
 	info        logger.Info
 	stream      io.ReadCloser
 }
 
-
+// driver does not perform the logging itself, but rather it manages an instance of
+// loggerContext for each image it handled the logs for. So mostly plumbing and
+// error handling.
 type driver struct {
 	mutex      sync.Mutex
 	logs    map[string]*loggerContext  // maps file name to logger responsible for it.
