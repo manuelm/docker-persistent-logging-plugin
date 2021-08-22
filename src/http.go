@@ -30,7 +30,8 @@ type response struct {
 }
 
 type capabilitiesResponse struct {
-	ReadLogs bool
+	Err string
+	Cap logger.Capability
 }
 
 
@@ -68,9 +69,9 @@ func handlers(handler *sdk.Handler, driver *driver) {
 	})
 
 	handler.HandleFunc("/LogDriver.Capabilities", func(writer http.ResponseWriter, request *http.Request) {
-	    var response = capabilitiesResponse{ReadLogs: true}
-		json.NewEncoder(writer).Encode(&response)
-	})
+	    json.NewEncoder(w).Encode(&capabilitiesResponse{
+			Cap: logger.Capability{ReadLogs: true},
+		})
 
 	handler.HandleFunc("/LogDriver.ReadLogs", func(writer http.ResponseWriter, response *http.Request) {
 		var req readLogsRequest
