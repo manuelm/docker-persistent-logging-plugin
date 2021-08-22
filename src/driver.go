@@ -21,90 +21,89 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type logPair struct {
+type loggerContext struct {
 	logger      logger.Logger
-	stream io.ReadCloser
-	info   logger.Info
+	info        logger.Info
+	stream      io.ReadCloser
 }
 
 
-// Actual logging driver. This is just a wrapper around dockers local file logging driver.
-// All the actual work is done
 type driver struct {
-	mu     sync.Mutex
-	logs   map[string]*logPair
-	idx    map[string]*logPair
-	logger logger.Logger
+	mutex      sync.Mutex
+	logs    map[string]*loggerContext  // maps file name to logger responsible for it.
 }
 
 
 func newDriver() *driver {
 	return &driver{
-		logs: make(map[string]*logPair),
-		idx:  make(map[string]*logPair),
+		logs: make(map[string]*loggerContext),
 	}
 }
 
 
-func (d *driver) StartLogging(file string, logCtx logger.Info) error {
-	d.mu.Lock()
-	if _, exists := d.logs[file]; exists {
-		d.mu.Unlock()
+func (driver *driver) StartLogging(file string, info logger.Info) error {
+    logrus.WithField("file", file).WithField("info", info).Debugf("StartLogging command received.")
+
+	driver.mutex.Lock()
+	if _, exists := driver.logs[file]; exists {
+		driver.mutex.Unlock()
 		return fmt.Errorf("logger for %q already exists", file)
 	}
-	d.mu.Unlock()
+	driver.mutex.Unlock()
 
-	if logCtx.LogPath == "" {
-		logCtx.LogPath = filepath.Join("/var/log/docker", logCtx.ContainerID)
-	}
-	if err := os.MkdirAll(filepath.Dir(logCtx.LogPath), 0755); err != nil {
+    if info.ContainerImageName == "" {
+        return errors.New("image name not provided in logging info")
+    }
+
+	info.LogPath = filepath.Join("/var/log/docker", info.ContainerImageName)
+	if err := os.MkdirAll(filepath.Dir(info.LogPath), 0755); err != nil {
 		return errors.Wrap(err, "error setting up logger dir")
 	}
-	logger, err := local.New(logCtx)
+
+	logger, err := local.New(info)
 	if err != nil {
-		return errors.Wrap(err, "error creating jsonfile logger")
+		return errors.Wrap(err, "error creating local logger")
 	}
 
-	logrus.WithField("id", logCtx.ContainerID).WithField("file", file).WithField("logpath", logCtx.LogPath).Debugf("Start logging")
-	f, err := fifo.OpenFifo(context.Background(), file, syscall.O_RDONLY, 0700)
+	steam, err := fifo.OpenFifo(context.Background(), file, syscall.O_RDONLY, 0700)
 	if err != nil {
-		return errors.Wrapf(err, "error opening logger fifo: %q", file)
+		return errors.Wrapf(err, "error opening logger file: %q", file)
 	}
 
-	d.mu.Lock()
-	lf := &logPair{logger, f, logCtx}
-	d.logs[file] = lf
-	d.idx[logCtx.ContainerID] = lf
-	d.mu.Unlock()
 
-	go consumeLog(lf)
+	driver.mutex.Lock()
+	loggerCtx := &loggerContext{logger, info, steam}
+	driver.logs[file] = loggerCtx
+	driver.mutex.Unlock()
+
+	go consumeLog(loggerCtx)
 	return nil
 }
 
 func (driver *driver) StopLogging(file string) error {
-	logrus.WithField("file", file).Debugf("Stop logging")
-	driver.mu.Lock()
-	lf, ok := driver.logs[file]
+	logrus.WithField("file", file).Debugf("StopLogging command received.")
+	driver.mutex.Lock()
+	loggerCtx, ok := driver.logs[file]
 	if ok {
-		lf.stream.Close()
+		loggerCtx.stream.Close()
 		delete(driver.logs, file)
 	}
-	driver.mu.Unlock()
+	driver.mutex.Unlock()
 	return nil
 }
 
-func consumeLog(lf *logPair) {
-	dec := protoio.NewUint32DelimitedReader(lf.stream, binary.BigEndian, 1e6)
+func consumeLog(loggerCtx *loggerContext) {
+	dec := protoio.NewUint32DelimitedReader(loggerCtx.stream, binary.BigEndian, 1e6)
 	defer dec.Close()
 	var buf logdriver.LogEntry
 	for {
 		if err := dec.ReadMsg(&buf); err != nil {
 			if err == io.EOF {
-				logrus.WithField("id", lf.info.ContainerID).WithError(err).Debug("shutting down log logger")
-				lf.stream.Close()
+				logrus.WithField("id", loggerCtx.info.ContainerID).WithError(err).Debug("Closing logger stream.")
+				loggerCtx.stream.Close()
 				return
 			}
-			dec = protoio.NewUint32DelimitedReader(lf.stream, binary.BigEndian, 1e6)
+			dec = protoio.NewUint32DelimitedReader(loggerCtx.stream, binary.BigEndian, 1e6)
 			continue
 		}
 		var msg logger.Message
@@ -118,8 +117,8 @@ func consumeLog(lf *logPair) {
 		}
 		msg.Timestamp = time.Unix(0, buf.TimeNano)
 
-		if err := lf.logger.Log(&msg); err != nil {
-			logrus.WithField("id", lf.info.ContainerID).WithError(err).WithField("message", msg).Error("error writing log message")
+		if err := loggerCtx.logger.Log(&msg); err != nil {
+			logrus.WithError(err).WithField("message", msg).Error("Error writing log message")
 			continue
 		}
 
@@ -128,23 +127,25 @@ func consumeLog(lf *logPair) {
 }
 
 func (d *driver) ReadLogs(info logger.Info, config logger.ReadConfig) (io.ReadCloser, error) {
-	d.mu.Lock()
-	lf, exists := d.idx[info.ContainerID]
-	d.mu.Unlock()
-	if !exists {
-		return nil, fmt.Errorf("logger does not exist for %s", info.ContainerID)
+    logrus.WithField("info", info).WithField("config", config).Debugf("ReadLogs command received.")
+    reader, writer := io.Pipe()
+
+    if info.ContainerImageName == "" {
+        return reader, errors.New("image name not provided in logging info")
+    }
+
+	info.LogPath = filepath.Join("/var/log/docker", info.ContainerImageName)
+	tempLogger, err := local.New(info)
+	if err != nil {
+		return reader, errors.Wrap(err, "error creating local logger")
 	}
 
-	r, w := io.Pipe()
-	lr, ok := lf.logger.(logger.LogReader)
-	if !ok {
-		return nil, fmt.Errorf("logger does not support reading")
-	}
+	logReader, _ := tempLogger.(logger.LogReader)
 
 	go func() {
-		watcher := lr.ReadLogs(config)
+		watcher := logReader.ReadLogs(config)
 
-		enc := protoio.NewUint32DelimitedWriter(w, binary.BigEndian)
+		enc := protoio.NewUint32DelimitedWriter(writer, binary.BigEndian)
 		defer enc.Close()
 		defer watcher.ConsumerGone()
 
@@ -153,7 +154,7 @@ func (d *driver) ReadLogs(info logger.Info, config logger.ReadConfig) (io.ReadCl
 			select {
 			case msg, ok := <-watcher.Msg:
 				if !ok {
-					w.Close()
+					writer.Close()
 					return
 				}
 
@@ -163,17 +164,16 @@ func (d *driver) ReadLogs(info logger.Info, config logger.ReadConfig) (io.ReadCl
 				buf.Source = msg.Source
 
 				if err := enc.WriteMsg(&buf); err != nil {
-					w.CloseWithError(err)
+					writer.CloseWithError(err)
 					return
 				}
 			case err := <-watcher.Err:
-				w.CloseWithError(err)
+				writer.CloseWithError(err)
 				return
 			}
 
 			buf.Reset()
 		}
 	}()
-
-	return r, nil
+	return reader, nil
 }

@@ -20,11 +20,7 @@ Installing and enabling persistent-logging-plugin
 
     $ docker plugin enable persistent-logging-plugin:0.0.1
 
-4. Restart the docker daemon for the plugin to be available::
-
-    $ service docker restart
-
-5. Ensure that it has been installed correctly::
+4. Ensure that it has been installed correctly::
 
     $ docker plugin ls
 

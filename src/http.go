@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 
@@ -12,59 +11,54 @@ import (
 )
 
 
-type StartLoggingRequest struct {
+type startLoggingRequest struct {
 	File string
 	Info logger.Info
 }
 
-type StopLoggingRequest struct {
+type stopLoggingRequest struct {
 	File string
 }
 
-type ReadLogsRequest struct {
+type readLogsRequest struct {
 	Info   logger.Info
 	Config logger.ReadConfig
 }
 
-type Response struct {
+type response struct {
 	Err string
 }
 
-type CapabilitiesResponse struct {
+type capabilitiesResponse struct {
 	ReadLogs bool
 }
 
 
 func respond(err error, writer http.ResponseWriter) {
-	var response Response
+	var resp response
 	if err != nil {
-		response.Err = err.Error()
+		resp.Err = err.Error()
 	}
-	json.NewEncoder(writer).Encode(&response)
+	json.NewEncoder(writer).Encode(&resp)
 }
 
 
-// handlers implements the LogDriver protocol with some sanity checking. The protocol is detailed here:
+// handlers implements the LogDriver protocol with some basic error handling. The protocol is detailed here:
 // https://docs.docker.com/engine/extend/plugins_logging/
 func handlers(handler *sdk.Handler, driver *driver) {
 
 	handler.HandleFunc("/LogDriver.StartLogging", func(writer http.ResponseWriter, request *http.Request) {
-		var req StartLoggingRequest
+		var req startLoggingRequest
 		if err := json.NewDecoder(request.Body).Decode(&req); err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if req.Info.ContainerImageName == "" {
-			respond(errors.New("must provide container image name in log context"), writer)
-			return
-		}
-
 		err := driver.StartLogging(req.File, req.Info)
 		respond(err, writer)
 	})
 
 	handler.HandleFunc("/LogDriver.StopLogging", func(writer http.ResponseWriter, request *http.Request) {
-		var req StopLoggingRequest
+		var req stopLoggingRequest
 		if err := json.NewDecoder(request.Body).Decode(&req); err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
@@ -74,12 +68,12 @@ func handlers(handler *sdk.Handler, driver *driver) {
 	})
 
 	handler.HandleFunc("/LogDriver.Capabilities", func(writer http.ResponseWriter, request *http.Request) {
-	    var response = CapabilitiesResponse{ReadLogs: true}
+	    var response = capabilitiesResponse{ReadLogs: true}
 		json.NewEncoder(writer).Encode(&response)
 	})
 
 	handler.HandleFunc("/LogDriver.ReadLogs", func(writer http.ResponseWriter, response *http.Request) {
-		var req ReadLogsRequest
+		var req readLogsRequest
 		if err := json.NewDecoder(response.Body).Decode(&req); err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
