@@ -27,6 +27,13 @@ Installing and enabling persistent-logging-plugin
     ID             NAME                                DESCRIPTION                                      ENABLED
     e2c4e98644d3   persistent-logging-plugin:0.0.1     docker logging plugin that persists the logs…    false
 
+5: Restart the docker engine::
+
+    $ service docker restart
+
+It'll log as it should if you don't restart the engine, but you will be unable to read the logs. ``(Client.Timeout exceeded while reading body)``. 
+I've not been able to figure out why, the internals of the docker engine is pretty opaque, and restarting it solves the issue; so why spend more time on it?
+
 Configuring persistent-logging-plugin
 =====================================
 
@@ -79,7 +86,7 @@ Supported options:
 
 Caveats:
 --------
-Docker plugins are ran as separate processes by the docker daemon, with separate filesystem. As such is it not possible
+1: Docker plugins are ran as separate processes by the docker daemon, with separate filesystem. As such is it not possible
 to specify the location on the host filesystem where the logs will be stored. They are stored at
 ``/var/lib/docker/plugins/<plugin id>/rootfs/var/logs``
 It might be possible to setup a bind mount for this location, however that will need to be specified in config.json,
@@ -89,4 +96,4 @@ The logs stored by the ``local`` file logging driver, and by extension ``persist
 only be accessed through the driver that created them via the ``docker logs`` command, so it is not a feature worth
 spending time on, imo.
 
-Running multiple containers from the same image, e.g. with Docker Swarm, is untested.
+2: Running multiple containers from the same image, e.g. with Docker Swarm, is untested.
