@@ -27,7 +27,7 @@ Installing and enabling persistent-logging-plugin
     ID             NAME                                DESCRIPTION                                      ENABLED
     e2c4e98644d3   persistent-logging-plugin:0.0.1     docker logging plugin that persists the logs…    false
 
-5: Restart the docker engine::
+5. Restart the docker engine::
 
     $ service docker restart
 
