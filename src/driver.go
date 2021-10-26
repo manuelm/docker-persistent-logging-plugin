@@ -101,9 +101,12 @@ func consumeLog(loggerCtx *loggerContext) {
     var buf logdriver.LogEntry
     for {
         if err := dec.ReadMsg(&buf); err != nil {
-            if err == io.EOF {
+            if errors.Is(err, io.EOF) {
                 logrus.WithField("id", loggerCtx.info.ContainerID).WithError(err).Debug("Closing logger stream.")
                 loggerCtx.stream.Close()
+                return
+            } else if errors.Is(err, os.ErrClosed) {
+                logrus.WithField("id", loggerCtx.info.ContainerID).WithError(err).Debug("Logger stream already closed.")
                 return
             }
             dec = protoio.NewUint32DelimitedReader(loggerCtx.stream, binary.BigEndian, 1e6)
