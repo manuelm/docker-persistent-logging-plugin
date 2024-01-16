@@ -54,11 +54,11 @@ func (driver *driver) StartLogging(file string, info logger.Info) error {
     }
     driver.mutex.Unlock()
 
-    if info.ContainerImageName == "" {
-        return errors.New("image name not provided in logging info")
-    }
+    //if info.ContainerImageName == "" {
+    //    return errors.New("image name not provided in logging info")
+    //}
 
-    info.LogPath = filepath.Join("/var/log/docker", info.ContainerImageName)
+    info.LogPath = filepath.Join("/var/log/docker", info.ContainerName + ".log")
     if err := os.MkdirAll(filepath.Dir(info.LogPath), 0755); err != nil {
         return errors.Wrap(err, "error setting up logger dir")
     }
@@ -136,11 +136,11 @@ func (d *driver) ReadLogs(info logger.Info, config logger.ReadConfig) (io.ReadCl
     logrus.WithField("info", info).WithField("config", config).Debugf("ReadLogs command received.")
     reader, writer := io.Pipe()
 
-    if info.ContainerImageName == "" {
-        return reader, errors.New("image name not provided in logging info")
-    }
+    //if info.ContainerImageName == "" {
+    //    return reader, errors.New("image name not provided in logging info")
+    //}
 
-    info.LogPath = filepath.Join("/var/log/docker", info.ContainerImageName)
+    info.LogPath = filepath.Join("/var/log/docker", info.ContainerName + ".log")
     tempLogger, err := local.New(info)
     if err != nil {
         return reader, errors.Wrap(err, "error creating local logger")
