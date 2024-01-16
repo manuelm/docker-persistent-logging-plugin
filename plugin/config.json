@@ -1,6 +1,6 @@
 {
 	"description": "docker logging plugin that persists the logs locally on disc.",
-	"documentation": "https://github.com/AlbinLindskog/persistent-logging-plugin",
+	"documentation": "https://github.com/manuelm/persistent-logging-plugin",
 	"entrypoint": ["/usr/bin/persistent-logging-plugin"],
 	"interface": {
 		"types": ["docker.logdriver/1.0"],
@@ -13,7 +13,16 @@
 			"value": "info",
 			"settable": ["value"]
 		}
+	],
+	"mounts" : [
+		{
+			"name" : "log-directory",
+			"description" : "The host directory that logs will be written to.",
+			"source" : "/var/log/",
+			"destination" : "/var/log/docker/",
+			"type" : "none",
+			"options" : [ "rbind" ],
+			"settable" : [ "source" ]
+		}
 	]
 }
-
-
