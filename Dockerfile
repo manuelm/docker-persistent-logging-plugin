@@ -1,4 +1,4 @@
-FROM  golang:1.15 as builder
+FROM golang:1.21-alpine3.19 as builder
 
 ENV GO111MODULE="on"
 
@@ -14,8 +14,8 @@ RUN go mod download
 
 # Add source code and build
 COPY ./src .
-RUN go build --ldflags '-extldflags "-static"' -o persistent-logging-plugin
+RUN go build --ldflags '-w -extldflags "-static"' -o persistent-logging-plugin
 
 # Copy compiled plugin over into to slim image to reduced the size
-FROM debian:buster-slim
+FROM alpine:3.19
 COPY --from=builder /build/persistent-logging-plugin /usr/bin/persistent-logging-plugin
